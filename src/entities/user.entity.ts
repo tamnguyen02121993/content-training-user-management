@@ -77,5 +77,5 @@ export class User extends Identity<string> {
   country: string;
 
   @OneToMany(() => UserRoles, (userRole) => userRole.user)
-  userRoles: UserRoles[];
+  userRoles!: UserRoles[];
 }

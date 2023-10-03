@@ -28,7 +28,7 @@ export class AuthService {
         sub: signInDto.id,
         email: signInDto.email,
         name: `${signInDto.firstName} ${signInDto.lastName}`,
-        roles: signInDto.roles,
+        permissions: signInDto.permissions,
       };
 
       const accessToken = await this.jwtService.signAsync(payload);

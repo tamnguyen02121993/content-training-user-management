@@ -9,13 +9,16 @@ import {
   handleErrorMessage,
   randomString,
 } from '../common';
-import { User } from '../entities';
+import { Role, User, UserRoles } from '../entities';
 import { UserDto, UpdateUserDto, CreateUserDto } from './dtos';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User) private readonly usersRepository: Repository<User>,
+    @InjectRepository(UserRoles)
+    private readonly userRolesRepository: Repository<UserRoles>,
+    @InjectRepository(Role) private readonly rolesRepository: Repository<Role>,
     @Inject(MODULE_NAMES.MAIL_CLIENT_MICROSERVICE)
     private readonly mailClient: ClientKafka,
   ) {}
@@ -24,6 +27,11 @@ export class UserService {
     try {
       const randomPassword = randomString();
       const password = await hash(randomPassword, 10);
+      const role = await this.rolesRepository.findOne({
+        where: {
+          name: 'user',
+        },
+      });
       const user: User = {
         email: createUserDto.email,
         country: createUserDto.country,
@@ -37,6 +45,12 @@ export class UserService {
       };
 
       const result = await this.usersRepository.insert(user);
+      await this.userRolesRepository.insert({
+        roleId: role.id,
+        userId: result.identifiers[0].id,
+        assignedAt: new Date().toISOString(),
+      });
+
       this.mailClient.emit(MAIL_PATTERNS.REGISTER, {
         email: user.email,
         fullName: `${user.firstName} ${user.lastName}`,
@@ -44,14 +58,19 @@ export class UserService {
       });
       return { ...result };
     } catch (error) {
-      console.log(error);
       throw new RpcException(handleErrorMessage(error));
     }
   }
 
   async getUsers(): Promise<UserDto[]> {
     try {
-      const users = await this.usersRepository.find();
+      const users = await this.usersRepository.find({
+        relations: {
+          userRoles: {
+            role: true,
+          },
+        },
+      });
       return users.map((user) => {
         return {
           ...user,
@@ -70,7 +89,11 @@ export class UserService {
         },
         relations: {
           userRoles: {
-            role: true,
+            role: {
+              rolePermissions: {
+                permission: true,
+              },
+            },
           },
         },
       });
