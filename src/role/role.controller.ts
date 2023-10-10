@@ -1,5 +1,5 @@
 import { Controller, UseFilters } from '@nestjs/common';
-import { ExceptionFilter, PATTERN_NAMES } from '../common';
+import { ExceptionFilter, PATTERN_NAMES, TableParamsDto } from '../common';
 import { RoleService } from './role.service';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { CreateRoleDto, UpdateRoleDto } from './dtos';
@@ -16,7 +16,7 @@ export class RoleController {
   }
 
   @MessagePattern(PATTERN_NAMES.UPDATE_ROLE)
-  updateUser(
+  updateRole(
     @Payload('id') id: string,
     @Payload('data') updateRoleDto: UpdateRoleDto,
   ) {
@@ -24,7 +24,7 @@ export class RoleController {
   }
 
   @MessagePattern(PATTERN_NAMES.DELETE_ROLE)
-  deleteUser(@Payload() userId: string) {
+  deleteRole(@Payload() userId: string) {
     return this.roleService.deleteRole(userId);
   }
 
@@ -34,7 +34,7 @@ export class RoleController {
   }
 
   @MessagePattern(PATTERN_NAMES.GET_ROLES)
-  getUsers() {
-    return this.roleService.getRoles();
+  getRoles(@Payload() tableParamsDto: TableParamsDto) {
+    return this.roleService.getRoles(tableParamsDto);
   }
 }

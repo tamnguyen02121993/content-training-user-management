@@ -1,9 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RpcException } from '@nestjs/microservices';
-import { DeleteResult, InsertResult, Repository, UpdateResult } from 'typeorm';
+import {
+  DeleteResult,
+  FindManyOptions,
+  InsertResult,
+  Like,
+  Repository,
+  UpdateResult,
+} from 'typeorm';
 import { Permission } from '../entities';
-import { handleErrorMessage } from '../common';
+import {
+  TableParamsDto,
+  TableResultDto,
+  generateTableDto,
+  handleErrorMessage,
+} from '../common';
 import {
   CreatePermissionDto,
   PermissionDto,
@@ -33,14 +45,44 @@ export class PermissionService {
     } catch (error) {}
   }
 
-  async getPermissions(): Promise<PermissionDto[]> {
+  async getPermissions(
+    tableParamsDto: TableParamsDto,
+  ): Promise<TableResultDto<PermissionDto>> {
     try {
-      const permissions = await this.permissionsRepository.find();
-      return permissions.map((permission) => {
+      let options: FindManyOptions<Permission> = {
+        skip: (tableParamsDto.currentPage - 1) * tableParamsDto.pageSize,
+        take: tableParamsDto.pageSize,
+      };
+      if (tableParamsDto.search) {
+        options = {
+          ...options,
+          where: {
+            name: Like(`%${tableParamsDto.search}%`),
+          },
+        };
+      }
+      if (tableParamsDto.sortField) {
+        options = {
+          ...options,
+          order: {
+            [tableParamsDto.sortField]:
+              tableParamsDto.sortOrder === 'descend' ? 'DESC' : 'ASC',
+          },
+        };
+      }
+      const result = await this.permissionsRepository.findAndCount(options);
+      const data = result[0].map((permission) => {
         return {
           ...permission,
         } as PermissionDto;
       });
+
+      return generateTableDto<PermissionDto>(
+        data,
+        result[1],
+        tableParamsDto.pageSize,
+        tableParamsDto.currentPage,
+      );
     } catch (error) {
       throw new RpcException(handleErrorMessage(error));
     }

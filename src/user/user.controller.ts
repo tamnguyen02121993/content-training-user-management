@@ -1,7 +1,7 @@
 import { Controller, UseFilters, UseGuards } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { UserService } from './user.service';
-import { PATTERN_NAMES, ExceptionFilter } from '../common';
+import { PATTERN_NAMES, ExceptionFilter, TableParamsDto } from '../common';
 import { CreateUserDto, UpdateUserDto } from './dtos';
 
 @UseFilters(new ExceptionFilter())
@@ -34,7 +34,7 @@ export class UserController {
   }
 
   @MessagePattern(PATTERN_NAMES.GET_USERS)
-  getUsers() {
-    return this.userService.getUsers();
+  getUsers(@Payload() tableParamsDto: TableParamsDto) {
+    return this.userService.getUsers(tableParamsDto);
   }
 }

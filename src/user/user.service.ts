@@ -2,10 +2,20 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ClientKafka, RpcException } from '@nestjs/microservices';
 import { hash } from 'bcrypt';
-import { DeleteResult, InsertResult, Repository, UpdateResult } from 'typeorm';
+import {
+  DeleteResult,
+  FindManyOptions,
+  InsertResult,
+  Like,
+  Repository,
+  UpdateResult,
+} from 'typeorm';
 import {
   MAIL_PATTERNS,
   MODULE_NAMES,
+  TableParamsDto,
+  TableResultDto,
+  generateTableDto,
   handleErrorMessage,
   randomString,
 } from '../common';
@@ -62,20 +72,63 @@ export class UserService {
     }
   }
 
-  async getUsers(): Promise<UserDto[]> {
+  async getUsers(
+    tableParamsDto: TableParamsDto,
+  ): Promise<TableResultDto<UserDto>> {
     try {
-      const users = await this.usersRepository.find({
+      let options: FindManyOptions<User> = {
         relations: {
           userRoles: {
             role: true,
           },
         },
-      });
-      return users.map((user) => {
+        skip: (tableParamsDto.currentPage - 1) * tableParamsDto.pageSize,
+        take: tableParamsDto.pageSize,
+      };
+
+      if (tableParamsDto.search) {
+        options = {
+          ...options,
+          where: {
+            email: Like(`%${tableParamsDto.search}%`),
+          },
+        };
+      }
+      if (tableParamsDto.sortField) {
+        const sortOrder =
+          tableParamsDto.sortOrder === 'descend' ? 'DESC' : 'ASC';
+        options = {
+          ...options,
+          order: {
+            [tableParamsDto.sortField]: sortOrder,
+          },
+        };
+
+        if (tableParamsDto.sortField === 'fullName') {
+          options = {
+            ...options,
+            order: {
+              firstName: sortOrder,
+              lastName: sortOrder,
+            },
+          };
+        }
+      }
+      const result = await this.usersRepository.findAndCount(options);
+
+      const data = result[0].map((user: User) => {
+        delete user.resetPasswordToken;
+        delete user.password;
         return {
           ...user,
         } as UserDto;
       });
+      return generateTableDto<UserDto>(
+        data,
+        result[1],
+        tableParamsDto.pageSize,
+        tableParamsDto.currentPage,
+      );
     } catch (error) {
       throw new RpcException(handleErrorMessage(error));
     }

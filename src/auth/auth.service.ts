@@ -12,6 +12,7 @@ import {
   handleErrorMessage,
   randomString,
 } from '../common';
+import { ConfigService } from '@nestjs/config';
 
 export class AuthService {
   constructor(
@@ -20,6 +21,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     @Inject(MODULE_NAMES.MAIL_CLIENT_MICROSERVICE)
     private readonly mailClient: ClientKafka,
+    private readonly configService: ConfigService,
   ) {}
 
   async signIn(signInDto: SignInDto) {
@@ -34,6 +36,8 @@ export class AuthService {
       const accessToken = await this.jwtService.signAsync(payload);
       return {
         access_token: accessToken,
+        email: payload.email,
+        fullName: payload.name,
       };
     } catch (error) {
       throw new RpcException(handleErrorMessage(error));
@@ -54,7 +58,9 @@ export class AuthService {
       this.mailClient.emit(MAIL_PATTERNS.REQUEST_RESET_PASSWORD, {
         email,
         token,
-        link: '',
+        link: `${this.configService.get(
+          'UI_URL',
+        )}/reset-password?email=${encodeURIComponent(email)}`,
       });
     } catch (error) {
       throw new RpcException(handleErrorMessage(error));
@@ -96,7 +102,7 @@ export class AuthService {
       const hashPassword = await hash(changePasswordDto.newPassword, 10);
       await this.usersRepository.update(
         {
-          id: changePasswordDto.id,
+          email: changePasswordDto.email,
         },
         {
           password: hashPassword,

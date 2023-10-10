@@ -17,11 +17,11 @@ export class Menu extends Identity<string> {
   name: string;
 
   @Column('uuid', { name: 'parent_id' })
-  parentId: string;
+  parentId?: string;
 
   @OneToOne(() => Menu, (menu) => menu.id)
   @JoinColumn()
-  parent: Menu;
+  parent?: Menu;
 
   @CreateDateColumn({
     type: 'timestamp without time zone',

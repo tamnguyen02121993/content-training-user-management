@@ -1,10 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeleteResult, InsertResult, Repository, UpdateResult } from 'typeorm';
+import {
+  DeleteResult,
+  FindManyOptions,
+  InsertResult,
+  Like,
+  Repository,
+  UpdateResult,
+} from 'typeorm';
 import { Role } from '../entities';
 import { CreateRoleDto, RoleDto, UpdateRoleDto } from './dtos';
-import { handleErrorMessage } from '../common';
+import {
+  TableParamsDto,
+  TableResultDto,
+  generateTableDto,
+  handleErrorMessage,
+} from '../common';
 
 @Injectable()
 export class RoleService {
@@ -26,14 +38,45 @@ export class RoleService {
     } catch (error) {}
   }
 
-  async getRoles(): Promise<RoleDto[]> {
+  async getRoles(
+    tableParamsDto: TableParamsDto,
+  ): Promise<TableResultDto<RoleDto>> {
     try {
-      const roles = await this.rolesRepository.find();
-      return roles.map((role) => {
+      let options: FindManyOptions<Role> = {
+        skip: (tableParamsDto.currentPage - 1) * tableParamsDto.pageSize,
+        take: tableParamsDto.pageSize,
+      };
+      if (tableParamsDto.search) {
+        options = {
+          ...options,
+          where: {
+            name: Like(`%${tableParamsDto.search}`),
+          },
+        };
+      }
+      if (tableParamsDto.sortField) {
+        options = {
+          ...options,
+          order: {
+            [tableParamsDto.sortField]:
+              tableParamsDto.sortOrder === 'descend' ? 'DESC' : 'ASC',
+          },
+        };
+      }
+
+      const result = await this.rolesRepository.findAndCount(options);
+      const data = result[0].map((role) => {
         return {
           ...role,
         } as RoleDto;
       });
+
+      return generateTableDto<RoleDto>(
+        data,
+        result[1],
+        tableParamsDto.pageSize,
+        tableParamsDto.currentPage,
+      );
     } catch (error) {
       throw new RpcException(handleErrorMessage(error));
     }
